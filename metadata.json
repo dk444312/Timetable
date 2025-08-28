@@ -1,0 +1,5 @@
+{
+  "name": "Student Timetable Manager",
+  "description": "A simple and intuitive application for students to create, manage, and share their course timetables. Users can upload their schedule details and easily view timetables by filtering for specific programs and years of study.",
+  "requestFramePermissions": []
+}
