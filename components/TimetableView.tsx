@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import jsPDF from 'jspdf';
 import { type TimetableEntry, YearOfStudy, DayOfWeek } from '../types';
 import Card from './shared/Card';
 import Select from './shared/Select';
@@ -19,7 +20,7 @@ const TimetableView: React.FC<TimetableViewProps> = ({ entries, loading, error }
     const years = new Set(entries.map(e => e.year_of_study));
     return {
       uniquePrograms: Array.from(programs).sort(),
-      uniqueYears: Array.from(years).sort((a,b) => Object.values(YearOfStudy).indexOf(a) - Object.values(YearOfStudy).indexOf(b))
+      uniqueYears: Array.from(years).sort((a, b) => Object.values(YearOfStudy).indexOf(a) - Object.values(YearOfStudy).indexOf(b))
     };
   }, [entries]);
 
@@ -33,7 +34,6 @@ const TimetableView: React.FC<TimetableViewProps> = ({ entries, loading, error }
   const groupedByDay = useMemo(() => {
     return filteredEntries.reduce((acc, entry) => {
       (acc[entry.day] = acc[entry.day] || []).push(entry);
-      // Sort entries by time
       acc[entry.day].sort((a, b) => a.time.localeCompare(b.time));
       return acc;
     }, {} as Record<DayOfWeek, TimetableEntry[]>);
@@ -47,91 +47,69 @@ const TimetableView: React.FC<TimetableViewProps> = ({ entries, loading, error }
     setIsDownloading(true);
 
     try {
-      // Create a new window for PDF generation
-      const printWindow = window.open('', '_blank');
-      if (!printWindow) {
-        setIsDownloading(false);
-        return;
-      }
+      const doc = new jsPDF();
+      let yOffset = 20;
 
-      const htmlContent = `
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <meta charset="UTF-8">
-          <title>Timetable - ${selectedProgram} ${selectedYear}</title>
-          <style>
-            @media print {
-              body { margin: 0; }
-              .no-print { display: none; }
-            }
-            body { font-family: Arial, sans-serif; margin: 20px; }
-            h1 { color: #4f46e5; margin-bottom: 20px; }
-            h2 { color: #374151; border-bottom: 2px solid #e5e7eb; padding-bottom: 5px; margin-top: 25px; }
-            .header { margin-bottom: 30px; }
-            .course { margin: 10px 0; padding: 15px; border: 1px solid #e5e7eb; border-radius: 5px; background: #f9fafb; }
-            .course-name { font-weight: bold; font-size: 16px; }
-            .course-details { color: #6b7280; font-size: 14px; margin-top: 5px; }
-          </style>
-        </head>
-        <body>
-          <div class="header">
-            <h1>Class Timetable</h1>
-            <p><strong>Program:</strong> ${selectedProgram}</p>
-            <p><strong>Year of Study:</strong> ${selectedYear}</p>
-            <p><strong>Generated on:</strong> ${new Date().toLocaleDateString()}</p>
-          </div>
-          
-          ${orderedDays.map(day => {
-            const dayEntries = groupedByDay[day];
-            if (!dayEntries || dayEntries.length === 0) return '';
-            
-            return `
-              <h2>${day}</h2>
-              ${dayEntries.map(entry => `
-                <div class="course">
-                  <div class="course-name">${entry.course_name} (${entry.course_code})</div>
-                  <div class="course-details">Time: ${entry.time} | Venue: ${entry.venue}</div>
-                </div>
-              `).join('')}
-            `;
-          }).join('')}
-          
-          <script>
-            window.onload = function() {
-              setTimeout(function() {
-                window.print();
-                window.onafterprint = function() {
-                  window.close();
-                };
-              }, 500);
-            };
-          </script>
-        </body>
-        </html>
-      `;
+      doc.setFontSize(20);
+      doc.setTextColor(79, 70, 229);
+      doc.text(`Class Timetable`, 20, yOffset);
+      yOffset += 10;
 
-      printWindow.document.write(htmlContent);
-      printWindow.document.close();
-      
-      // Set a timeout to close loading state
-      setTimeout(() => {
-        setIsDownloading(false);
-      }, 2000);
-      
+      doc.setFontSize(12);
+      doc.setTextColor(0, 0, 0);
+      doc.text(`Program: ${selectedProgram}`, 20, yOffset);
+      yOffset += 7;
+      doc.text(`Year of Study: ${selectedYear}`, 20, yOffset);
+      yOffset += 7;
+      doc.text(`Generated on: ${new Date().toLocaleDateString()}`, 20, yOffset);
+      yOffset += 15;
+
+      orderedDays.forEach((day) => {
+        const dayEntries = groupedByDay[day];
+        if (!dayEntries || dayEntries.length === 0) return;
+
+        doc.setFontSize(16);
+        doc.setTextColor(55, 65, 81);
+        doc.text(day, 20, yOffset);
+        yOffset += 7;
+        doc.setLineWidth(0.5);
+        doc.line(20, yOffset, 190, yOffset);
+        yOffset += 10;
+
+        doc.setFontSize(12);
+        dayEntries.forEach((entry) => {
+          doc.setTextColor(0, 0, 0);
+          doc.text(`${entry.course_name} (${entry.course_code})`, 20, yOffset);
+          yOffset += 7;
+          doc.setTextColor(107, 114, 128);
+          doc.text(`Time: ${entry.time} | Venue: ${entry.venue}`, 20, yOffset);
+          yOffset += 10;
+
+          if (yOffset > 260) {
+            doc.addPage();
+            yOffset = 20;
+          }
+        });
+
+        yOffset += 10;
+      });
+
+      doc.save(`Timetable_${selectedProgram}_${selectedYear}.pdf`);
+      setIsDownloading(false);
     } catch (error) {
-      console.error('Download failed:', error);
+      console.error('PDF generation failed:', error);
+      alert('Failed to generate PDF. Please try again.');
       setIsDownloading(false);
     }
   };
-  
+
   const renderContent = () => {
     if (loading) {
       return <div className="text-center py-12"><p className="text-slate-500 dark:text-slate-400">Loading timetable...</p></div>;
     }
     
     if (error) {
-       return <div className="text-center py-12"><p className="text-red-500 dark:text-red-400">{error}</p></div>;
+      return <div className="text-center py-12"><p className="text-red-500 dark:text-red-400">{error}</p></div>;
     }
     
     if (!selectedProgram || !selectedYear) {
