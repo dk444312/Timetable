@@ -46,45 +46,64 @@ const TimetableView: React.FC<TimetableViewProps> = ({ entries, loading, error }
 
     setIsDownloading(true);
 
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) {
-      setIsDownloading(false);
-      return;
-    }
-
-    const htmlContent = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <title>Timetable - ${selectedProgram} ${selectedYear}</title>
-      </head>
-      <body>
-        <h1>Timetable</h1>
-        <p>Program: ${selectedProgram}</p>
-        <p>Year: ${selectedYear}</p>
-        
-        ${orderedDays.map(day => {
-          const dayEntries = groupedByDay[day];
-          if (!dayEntries || dayEntries.length === 0) return '';
+    try {
+      // Create HTML content for PDF
+      const htmlContent = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="UTF-8">
+          <title>Timetable - ${selectedProgram} ${selectedYear}</title>
+          <style>
+            body { font-family: Arial, sans-serif; margin: 20px; }
+            h1 { color: #4f46e5; }
+            h2 { color: #374151; border-bottom: 1px solid #e5e7eb; padding-bottom: 5px; }
+            .course { margin: 10px 0; padding: 10px; border: 1px solid #e5e7eb; border-radius: 5px; }
+            .course-name { font-weight: bold; }
+            .course-details { color: #6b7280; font-size: 14px; }
+          </style>
+        </head>
+        <body>
+          <h1>Timetable</h1>
+          <p><strong>Program:</strong> ${selectedProgram}</p>
+          <p><strong>Year:</strong> ${selectedYear}</p>
+          <p><strong>Generated:</strong> ${new Date().toLocaleDateString()}</p>
           
-          return `
-            <h2>${day}</h2>
-            ${dayEntries.map(entry => `
-              <p>${entry.course_name} (${entry.course_code}) - ${entry.time} - ${entry.venue}</p>
-            `).join('')}
-          `;
-        }).join('')}
-      </body>
-      </html>
-    `;
+          ${orderedDays.map(day => {
+            const dayEntries = groupedByDay[day];
+            if (!dayEntries || dayEntries.length === 0) return '';
+            
+            return `
+              <h2>${day}</h2>
+              ${dayEntries.map(entry => `
+                <div class="course">
+                  <div class="course-name">${entry.course_name} (${entry.course_code})</div>
+                  <div class="course-details">Time: ${entry.time} | Venue: ${entry.venue}</div>
+                </div>
+              `).join('')}
+            `;
+          }).join('')}
+        </body>
+        </html>
+      `;
 
-    printWindow.document.write(htmlContent);
-    printWindow.document.close();
-    printWindow.onload = () => {
-      printWindow.print();
-      printWindow.close();
+      // Create blob and download
+      const blob = new Blob([htmlContent], { type: 'text/html' });
+      const url = URL.createObjectURL(blob);
+      
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Timetable_${selectedProgram.replace(/\s+/g, '_')}_${selectedYear.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.html`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      
       setIsDownloading(false);
-    };
+    } catch (error) {
+      console.error('Download failed:', error);
+      setIsDownloading(false);
+    }
   };
   
   const renderContent = () => {
