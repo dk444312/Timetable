@@ -1,5 +1,4 @@
-import React, { useState, useMemo, useRef } from 'react';
-import { Download } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
 import { type TimetableEntry, YearOfStudy, DayOfWeek } from '../types';
 import Card from './shared/Card';
 import Select from './shared/Select';
@@ -14,7 +13,6 @@ const TimetableView: React.FC<TimetableViewProps> = ({ entries, loading, error }
   const [selectedProgram, setSelectedProgram] = useState<string>('');
   const [selectedYear, setSelectedYear] = useState<string>('');
   const [isDownloading, setIsDownloading] = useState(false);
-  const timetableRef = useRef<HTMLDivElement>(null);
 
   const { uniquePrograms, uniqueYears } = useMemo(() => {
     const programs = new Set(entries.map(e => e.program_of_study));
@@ -44,171 +42,49 @@ const TimetableView: React.FC<TimetableViewProps> = ({ entries, loading, error }
   const orderedDays = Object.values(DayOfWeek);
 
   const downloadPDF = async () => {
-    if (!selectedProgram || !selectedYear || filteredEntries.length === 0) {
-      alert('Please select a program and year with available timetable entries before downloading.');
-      return;
-    }
+    if (!selectedProgram || !selectedYear || filteredEntries.length === 0) return;
 
     setIsDownloading(true);
 
-    try {
-      // Create a new window for printing
-      const printWindow = window.open('', '_blank');
-      if (!printWindow) {
-        throw new Error('Failed to open print window. Please allow popups and try again.');
-      }
-
-      // Generate HTML content for PDF
-      const htmlContent = `
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <title>Timetable - ${selectedProgram} ${selectedYear}</title>
-          <style>
-            body {
-              font-family: Arial, sans-serif;
-              margin: 20px;
-              color: #333;
-              line-height: 1.4;
-            }
-            .header {
-              text-align: center;
-              margin-bottom: 30px;
-              border-bottom: 2px solid #4f46e5;
-              padding-bottom: 15px;
-            }
-            .header h1 {
-              color: #4f46e5;
-              margin: 0 0 10px 0;
-              font-size: 24px;
-            }
-            .header p {
-              margin: 5px 0;
-              color: #666;
-              font-size: 14px;
-            }
-            .day-section {
-              margin-bottom: 25px;
-              page-break-inside: avoid;
-            }
-            .day-title {
-              color: #4f46e5;
-              font-size: 18px;
-              font-weight: bold;
-              border-bottom: 1px solid #e2e8f0;
-              padding-bottom: 8px;
-              margin-bottom: 15px;
-            }
-            .course-entry {
-              display: flex;
-              justify-content: space-between;
-              align-items: center;
-              padding: 12px;
-              margin-bottom: 10px;
-              border: 1px solid #e2e8f0;
-              border-radius: 6px;
-              background-color: #f8fafc;
-            }
-            .course-info {
-              flex: 1;
-            }
-            .course-name {
-              font-weight: bold;
-              margin-bottom: 4px;
-              font-size: 14px;
-            }
-            .course-code {
-              color: #666;
-              font-size: 12px;
-              font-weight: normal;
-            }
-            .course-venue {
-              color: #666;
-              font-size: 12px;
-              margin-top: 2px;
-            }
-            .course-time {
-              font-family: monospace;
-              background-color: #e0e7ff;
-              color: #3730a3;
-              padding: 6px 10px;
-              border-radius: 20px;
-              font-size: 12px;
-              white-space: nowrap;
-            }
-            .no-entries {
-              text-align: center;
-              color: #666;
-              font-style: italic;
-              padding: 20px;
-            }
-            @media print {
-              body { margin: 15px; }
-              .day-section { page-break-inside: avoid; }
-            }
-          </style>
-        </head>
-        <body>
-          <div class="header">
-            <h1>Class Timetable</h1>
-            <p><strong>Program:</strong> ${selectedProgram}</p>
-            <p><strong>Year of Study:</strong> ${selectedYear}</p>
-            <p><strong>Generated on:</strong> ${new Date().toLocaleDateString('en-US', { 
-              year: 'numeric', 
-              month: 'long', 
-              day: 'numeric',
-              hour: '2-digit',
-              minute: '2-digit'
-            })}</p>
-          </div>
-          
-          ${orderedDays.map(day => {
-            const dayEntries = groupedByDay[day];
-            if (!dayEntries || dayEntries.length === 0) return '';
-            
-            return `
-              <div class="day-section">
-                <div class="day-title">${day}</div>
-                ${dayEntries.map(entry => `
-                  <div class="course-entry">
-                    <div class="course-info">
-                      <div class="course-name">
-                        ${entry.course_name}
-                        <span class="course-code">(${entry.course_code})</span>
-                      </div>
-                      <div class="course-venue">Venue: ${entry.venue}</div>
-                    </div>
-                    <div class="course-time">${entry.time}</div>
-                  </div>
-                `).join('')}
-              </div>
-            `;
-          }).join('')}
-          
-          ${filteredEntries.length === 0 ? '<div class="no-entries">No timetable entries found.</div>' : ''}
-        </body>
-        </html>
-      `;
-
-      // Write content and trigger print
-      printWindow.document.write(htmlContent);
-      printWindow.document.close();
-
-      // Wait for content to load then print
-      printWindow.onload = () => {
-        setTimeout(() => {
-          printWindow.focus();
-          printWindow.print();
-          printWindow.close();
-          setIsDownloading(false);
-        }, 500);
-      };
-
-    } catch (error) {
-      console.error('Error generating PDF:', error);
-      alert('Failed to generate PDF. Please try again.');
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
       setIsDownloading(false);
+      return;
     }
+
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Timetable - ${selectedProgram} ${selectedYear}</title>
+      </head>
+      <body>
+        <h1>Timetable</h1>
+        <p>Program: ${selectedProgram}</p>
+        <p>Year: ${selectedYear}</p>
+        
+        ${orderedDays.map(day => {
+          const dayEntries = groupedByDay[day];
+          if (!dayEntries || dayEntries.length === 0) return '';
+          
+          return `
+            <h2>${day}</h2>
+            ${dayEntries.map(entry => `
+              <p>${entry.course_name} (${entry.course_code}) - ${entry.time} - ${entry.venue}</p>
+            `).join('')}
+          `;
+        }).join('')}
+      </body>
+      </html>
+    `;
+
+    printWindow.document.write(htmlContent);
+    printWindow.document.close();
+    printWindow.onload = () => {
+      printWindow.print();
+      printWindow.close();
+      setIsDownloading(false);
+    };
   };
   
   const renderContent = () => {
@@ -237,7 +113,7 @@ const TimetableView: React.FC<TimetableViewProps> = ({ entries, loading, error }
     }
     
     return (
-      <div className="space-y-8" ref={timetableRef}>
+      <div className="space-y-8">
         {orderedDays.map(day => (
           groupedByDay[day] && groupedByDay[day].length > 0 && (
             <div key={day}>
@@ -274,7 +150,9 @@ const TimetableView: React.FC<TimetableViewProps> = ({ entries, loading, error }
               disabled={isDownloading}
               className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white font-medium rounded-lg transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
             >
-              <Download size={18} />
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
               {isDownloading ? 'Generating PDF...' : 'Download PDF'}
             </button>
           )}
