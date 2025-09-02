@@ -47,7 +47,13 @@ const TimetableView: React.FC<TimetableViewProps> = ({ entries, loading, error }
     setIsDownloading(true);
 
     try {
-      // Create HTML content for PDF
+      // Create a new window for PDF generation
+      const printWindow = window.open('', '_blank');
+      if (!printWindow) {
+        setIsDownloading(false);
+        return;
+      }
+
       const htmlContent = `
         <!DOCTYPE html>
         <html>
@@ -55,19 +61,26 @@ const TimetableView: React.FC<TimetableViewProps> = ({ entries, loading, error }
           <meta charset="UTF-8">
           <title>Timetable - ${selectedProgram} ${selectedYear}</title>
           <style>
+            @media print {
+              body { margin: 0; }
+              .no-print { display: none; }
+            }
             body { font-family: Arial, sans-serif; margin: 20px; }
-            h1 { color: #4f46e5; }
-            h2 { color: #374151; border-bottom: 1px solid #e5e7eb; padding-bottom: 5px; }
-            .course { margin: 10px 0; padding: 10px; border: 1px solid #e5e7eb; border-radius: 5px; }
-            .course-name { font-weight: bold; }
-            .course-details { color: #6b7280; font-size: 14px; }
+            h1 { color: #4f46e5; margin-bottom: 20px; }
+            h2 { color: #374151; border-bottom: 2px solid #e5e7eb; padding-bottom: 5px; margin-top: 25px; }
+            .header { margin-bottom: 30px; }
+            .course { margin: 10px 0; padding: 15px; border: 1px solid #e5e7eb; border-radius: 5px; background: #f9fafb; }
+            .course-name { font-weight: bold; font-size: 16px; }
+            .course-details { color: #6b7280; font-size: 14px; margin-top: 5px; }
           </style>
         </head>
         <body>
-          <h1>Timetable</h1>
-          <p><strong>Program:</strong> ${selectedProgram}</p>
-          <p><strong>Year:</strong> ${selectedYear}</p>
-          <p><strong>Generated:</strong> ${new Date().toLocaleDateString()}</p>
+          <div class="header">
+            <h1>Class Timetable</h1>
+            <p><strong>Program:</strong> ${selectedProgram}</p>
+            <p><strong>Year of Study:</strong> ${selectedYear}</p>
+            <p><strong>Generated on:</strong> ${new Date().toLocaleDateString()}</p>
+          </div>
           
           ${orderedDays.map(day => {
             const dayEntries = groupedByDay[day];
@@ -83,23 +96,29 @@ const TimetableView: React.FC<TimetableViewProps> = ({ entries, loading, error }
               `).join('')}
             `;
           }).join('')}
+          
+          <script>
+            window.onload = function() {
+              setTimeout(function() {
+                window.print();
+                window.onafterprint = function() {
+                  window.close();
+                };
+              }, 500);
+            };
+          </script>
         </body>
         </html>
       `;
 
-      // Create blob and download
-      const blob = new Blob([htmlContent], { type: 'text/html' });
-      const url = URL.createObjectURL(blob);
+      printWindow.document.write(htmlContent);
+      printWindow.document.close();
       
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `Timetable_${selectedProgram.replace(/\s+/g, '_')}_${selectedYear.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.html`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      // Set a timeout to close loading state
+      setTimeout(() => {
+        setIsDownloading(false);
+      }, 2000);
       
-      setIsDownloading(false);
     } catch (error) {
       console.error('Download failed:', error);
       setIsDownloading(false);
