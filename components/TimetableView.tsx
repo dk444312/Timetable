@@ -1,5 +1,4 @@
 import React, { useState, useMemo } from 'react';
-import jsPDF from 'jspdf';
 import { type TimetableEntry, YearOfStudy, DayOfWeek } from '../types';
 import Card from './shared/Card';
 import Select from './shared/Select';
@@ -47,11 +46,18 @@ const TimetableView: React.FC<TimetableViewProps> = ({ entries, loading, error }
     setIsDownloading(true);
 
     try {
+      // Access jsPDF from the global window object
+      const { jsPDF } = window.jspdf;
+      if (!jsPDF) {
+        throw new Error('jsPDF library not loaded. Please ensure the jsPDF CDN is included.');
+      }
+
       const doc = new jsPDF();
       let yOffset = 20;
 
+      // Add header
       doc.setFontSize(20);
-      doc.setTextColor(79, 70, 229);
+      doc.setTextColor(79, 70, 229); // Indigo color
       doc.text(`Class Timetable`, 20, yOffset);
       yOffset += 10;
 
@@ -64,16 +70,17 @@ const TimetableView: React.FC<TimetableViewProps> = ({ entries, loading, error }
       doc.text(`Generated on: ${new Date().toLocaleDateString()}`, 20, yOffset);
       yOffset += 15;
 
+      // Add timetable entries
       orderedDays.forEach((day) => {
         const dayEntries = groupedByDay[day];
         if (!dayEntries || dayEntries.length === 0) return;
 
         doc.setFontSize(16);
-        doc.setTextColor(55, 65, 81);
+        doc.setTextColor(55, 65, 81); // Gray color for day headers
         doc.text(day, 20, yOffset);
         yOffset += 7;
         doc.setLineWidth(0.5);
-        doc.line(20, yOffset, 190, yOffset);
+        doc.line(20, yOffset, 190, yOffset); // Horizontal line
         yOffset += 10;
 
         doc.setFontSize(12);
@@ -81,10 +88,11 @@ const TimetableView: React.FC<TimetableViewProps> = ({ entries, loading, error }
           doc.setTextColor(0, 0, 0);
           doc.text(`${entry.course_name} (${entry.course_code})`, 20, yOffset);
           yOffset += 7;
-          doc.setTextColor(107, 114, 128);
+          doc.setTextColor(107, 114, 128); // Gray for details
           doc.text(`Time: ${entry.time} | Venue: ${entry.venue}`, 20, yOffset);
           yOffset += 10;
 
+          // Add page break if content exceeds page height
           if (yOffset > 260) {
             doc.addPage();
             yOffset = 20;
@@ -94,11 +102,12 @@ const TimetableView: React.FC<TimetableViewProps> = ({ entries, loading, error }
         yOffset += 10;
       });
 
+      // Save the PDF
       doc.save(`Timetable_${selectedProgram}_${selectedYear}.pdf`);
       setIsDownloading(false);
     } catch (error) {
       console.error('PDF generation failed:', error);
-      alert('Failed to generate PDF. Please try again.');
+      alert('Failed to generate PDF. Please ensure the jsPDF library is loaded and try again.');
       setIsDownloading(false);
     }
   };
